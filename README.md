@@ -2,7 +2,7 @@
 
 denial of service tool for crashing internet connections using udp and tcp methods (wip).
 
-![image](https://github.com/user-attachments/assets/764d958a-5393-499d-bdb2-13e5d2a8c02b)
+<img width="542" height="344" alt="image" src="https://github.com/user-attachments/assets/c94d7d4d-4d3e-45d2-aef9-08460e19bb75" />
 
 ## usage
 
@@ -15,13 +15,5 @@ port: the target port number
 threads: the number of threads to use (determines the number of loops to be sent)
 protocol: choose either udp or tcp (method of dos-ing)
 note: this script is for educational purposes only. the author is not responsible for any misuse of this tool.
-
-### changes:
-
-- **Simplified Language**: Streamlined the descriptions for better clarity.
-- **Consistent Lowercase**: Maintained all lowercase as requested.
-- **Formatting**: Used Markdown for clean and readable formatting on GitHub.
-- **Usage Instructions**: Provided step-by-step instructions for installing the package and running the script.
-- **Disclaimer**: Emphasized the educational purpose and the author’s lack of responsibility for misuse.
 
 `README.md`
